@@ -6,9 +6,18 @@ Fetch, search, and browse YouTube transcripts directly from the Strapi admin cha
 
 ## Requirements
 
-- Strapi v5.33+
-- `strapi-plugin-ai-sdk` >= 0.7.0 (must be installed and enabled)
+- Strapi >= 5.47.0
+- `strapi-plugin-ai-sdk` ^1.1.0 (must be installed and enabled)
 - Node.js 18+
+
+As of `v1.1.0`, this plugin's tools reach external AI clients through
+Strapi's own official MCP server at `/mcp` (not a plugin-owned endpoint).
+That requires the host app to set `mcp: { enabled: true }` in its own
+`config/server.ts`, and the connecting Admin API token's role to be granted
+`plugin::ai-sdk.mcp.read` (registered by `strapi-plugin-ai-sdk`, since all of
+this plugin's tools are `publicSafe: true` and therefore tier as `read`).
+See [`strapi-plugin-ai-sdk`'s plugin contract](https://github.com/PaulBratslavsky/strapi-plugin-ai-sdk/blob/main/docs/plugin-contract.md)
+for the full permission-tier and namespacing details.
 
 ## Installation
 
@@ -151,7 +160,7 @@ export default () => ({
 });
 ```
 
-Once discovered, the ai-sdk handles the rest — tools are available in admin chat, public chat (since all are `publicSafe`), and exposed on the MCP server as snake_case names (`ai_sdk_transcripts__fetch_transcript`, etc.).
+Once discovered, the ai-sdk handles the rest — tools are available in admin chat, public chat (since all are `publicSafe`), and, when the host has MCP enabled (Strapi >= 5.47 with `mcp: { enabled: true }`) and the connecting token grants `plugin::ai-sdk.mcp.read`, exposed via Strapi's official `/mcp` endpoint as snake_case names (`ai_sdk_yt_transcripts__fetch_transcript`, etc.).
 
 ### Architecture
 
