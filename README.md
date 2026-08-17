@@ -14,8 +14,9 @@ As of `v1.1.0`, this plugin's tools reach external AI clients through
 Strapi's own official MCP server at `/mcp` (not a plugin-owned endpoint).
 That requires the host app to set `mcp: { enabled: true }` in its own
 `config/server.ts`, and the connecting Admin API token's role to be granted
-`plugin::ai-sdk.mcp.read` (registered by `strapi-plugin-ai-sdk`, since all of
-this plugin's tools are `publicSafe: true` and therefore tier as `read`).
+`plugin::ai-sdk.mcp.read` (for `getTranscript`, `searchTranscript`, `listTranscripts`, `findTranscripts`)
+or `plugin::ai-sdk.mcp.write` (required by `fetchTranscript`, which persists transcripts
+and triggers downstream embedding operations in the sibling yt-embeddings plugin).
 See [`strapi-plugin-ai-sdk`'s plugin contract](https://github.com/PaulBratslavsky/strapi-plugin-ai-sdk/blob/main/docs/plugin-contract.md)
 for the full permission-tier and namespacing details.
 
@@ -160,7 +161,7 @@ export default () => ({
 });
 ```
 
-Once discovered, the ai-sdk handles the rest — tools are available in admin chat, public chat (since all are `publicSafe`), and, when the host has MCP enabled (Strapi >= 5.47 with `mcp: { enabled: true }`) and the connecting token grants `plugin::ai-sdk.mcp.read`, exposed via Strapi's official `/mcp` endpoint as snake_case names (`ai_sdk_yt_transcripts__fetch_transcript`, etc.).
+Once discovered, the ai-sdk handles the rest — tools are available in admin chat, public chat (since all are `publicSafe`), and, when the host has MCP enabled (Strapi >= 5.47 with `mcp: { enabled: true }`) and the connecting token grants the appropriate tier permission, exposed via Strapi's official `/mcp` endpoint as snake_case names. Read-tier tools like `ai_sdk_yt_transcripts__get_transcript` require `plugin::ai-sdk.mcp.read`, while `ai_sdk_yt_transcripts__fetch_transcript` requires `plugin::ai-sdk.mcp.write`.
 
 ### Architecture
 
