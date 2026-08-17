@@ -126,5 +126,11 @@ export const fetchTranscriptTool: ToolDefinition = {
   description: fetchTranscriptDescription,
   schema: fetchTranscriptSchema,
   execute,
+  // Not read-only: saveTranscript() creates a document, which fires
+  // yt-embeddings' afterCreate lifecycle hook (OpenAI embeddings call +
+  // pgvector writes). publicSafe stays true (safe for the public chat
+  // endpoint's UX), but the MCP tier must be 'write' so a read-scoped
+  // admin token cannot trigger creation + spend.
   publicSafe: true,
+  access: 'write',
 };

@@ -26,6 +26,15 @@ export interface ToolDefinition {
 
   /** If true, safe for unauthenticated public chat (read-only). */
   publicSafe?: boolean;
+
+  /**
+   * MCP permission tier. Defaults to 'read' when publicSafe is true,
+   * otherwise 'write'. Set explicitly for tools whose risk does not match
+   * that default — e.g. a "read" tool that writes to the database or has
+   * an irreversible/external-side-effect (mirrors the hub's
+   * `server/src/mcp/access.ts#tierFor`).
+   */
+  access?: 'read' | 'write' | 'destructive';
 }
 
 import { fetchTranscriptTool } from './fetch-transcript';
