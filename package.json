@@ -74,6 +74,11 @@
     "react-router-dom": "^6.28.0",
     "styled-components": "^6.1.13"
   },
+  "peerDependenciesMeta": {
+    "strapi-plugin-ai-sdk": {
+      "optional": true
+    }
+  },
   "engines": {
     "node": ">=18.0.0 <=24.x.x",
     "npm": ">=6.0.0"
