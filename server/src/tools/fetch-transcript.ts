@@ -126,5 +126,15 @@ export const fetchTranscriptTool: ToolDefinition = {
   description: fetchTranscriptDescription,
   schema: fetchTranscriptSchema,
   execute,
+  // Not read-only: saveTranscript() creates a document, which fires
+  // yt-embeddings' afterCreate lifecycle hook (OpenAI embeddings call +
+  // pgvector writes). It also hits YouTube directly. publicSafe stays true
+  // (safe for the public chat endpoint's UX), but the salient MCP-tier fact
+  // isn't the database write — it's that this call reaches an external
+  // service and cascades into a paid, uncapped embedding run. That's the
+  // 'maintenance' tier (expensive / external-side-effect / hard to undo),
+  // not 'write': a browse-and-annotate token (read + write) must not be
+  // able to trigger it.
   publicSafe: true,
+  access: 'maintenance',
 };

@@ -6,9 +6,34 @@ Fetch, search, and browse YouTube transcripts directly from the Strapi admin cha
 
 ## Requirements
 
-- Strapi v5.33+
-- `strapi-plugin-ai-sdk` >= 0.7.0 (must be installed and enabled)
+- Strapi >= 5.47.0
+- `strapi-plugin-ai-sdk` ^1.1.0 (must be installed and enabled)
 - Node.js 18+
+
+> **Peer dependency note:** `strapi-plugin-ai-sdk` is declared as a
+> `peerDependency` at `^1.1.0` because that's genuinely the version this
+> plugin requires — but `1.1.0` has not been published to npm yet (the
+> registry currently tops out at `0.10.0`). It's marked
+> `optional: true` in `peerDependenciesMeta` so `npm install` doesn't try to
+> auto-install a version that doesn't exist and fail with `notarget`. This
+> plugin still won't function without the hub actually installed and
+> enabled — `optional` only affects npm's install-time resolution, not the
+> runtime requirement. Once `strapi-plugin-ai-sdk@1.1.0` is published, this
+> starts resolving normally; the `optional` flag can be removed at that
+> point if you want npm to auto-install it again, but leaving it in place
+> is also safe going forward.
+
+As of `v1.1.0`, this plugin's tools reach external AI clients through
+Strapi's own official MCP server at `/mcp` (not a plugin-owned endpoint).
+That requires the host app to set `mcp: { enabled: true }` in its own
+`config/server.ts`, and the connecting Admin API token's role to be granted
+`plugin::ai-sdk.mcp.read` (for `getTranscript`, `searchTranscript`, `listTranscripts`, `findTranscripts`)
+or `plugin::ai-sdk.mcp.maintenance` (required by `fetchTranscript`, which hits YouTube
+directly and persists transcripts, triggering downstream OpenAI embedding operations in the
+sibling yt-embeddings plugin — the salient risk is external cost, not just the database write,
+so it tiers as `maintenance` rather than `write`).
+See [`strapi-plugin-ai-sdk`'s plugin contract](https://github.com/PaulBratslavsky/strapi-plugin-ai-sdk/blob/main/docs/plugin-contract.md)
+for the full permission-tier and namespacing details.
 
 ## Installation
 
@@ -151,7 +176,7 @@ export default () => ({
 });
 ```
 
-Once discovered, the ai-sdk handles the rest — tools are available in admin chat, public chat (since all are `publicSafe`), and exposed on the MCP server as snake_case names (`ai_sdk_transcripts__fetch_transcript`, etc.).
+Once discovered, the ai-sdk handles the rest — tools are available in admin chat, public chat (since all are `publicSafe`), and, when the host has MCP enabled (Strapi >= 5.47 with `mcp: { enabled: true }`) and the connecting token grants the appropriate tier permission, exposed via Strapi's official `/mcp` endpoint as snake_case names. Read-tier tools like `ai_sdk_yt_transcripts__get_transcript` require `plugin::ai-sdk.mcp.read`, while `ai_sdk_yt_transcripts__fetch_transcript` requires `plugin::ai-sdk.mcp.maintenance` (it hits YouTube and cascades into a paid embedding run, not just a database write).
 
 ### Architecture
 
