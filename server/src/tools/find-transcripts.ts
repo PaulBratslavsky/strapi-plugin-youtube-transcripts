@@ -73,7 +73,7 @@ function truncateText(text: string | null | undefined, maxLength: number): strin
  * `searchTranscript` exist to fetch content for one video, and the count is
  * kept so the model knows the data is there to ask for.
  */
-function truncateTranscripts(transcripts: any[]): any[] {
+export function truncateTranscripts(transcripts: any[]): any[] {
   return transcripts.map((transcript) => {
     const { transcriptWithTimeCodes, ...rest } = transcript;
 
