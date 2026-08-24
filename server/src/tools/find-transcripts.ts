@@ -59,13 +59,30 @@ function truncateText(text: string | null | undefined, maxLength: number): strin
 }
 
 /**
- * Truncates transcript fields in an array of transcripts
+ * Reduce a search result to what a search result needs.
+ *
+ * This used to spread the whole record and truncate only `fullTranscript`,
+ * which trimmed the small field and left the large one alone.
+ * `transcriptWithTimeCodes` is the bulk of a transcript: one 12 minute video
+ * returned about 31KB, roughly 7,800 tokens, which is more than this plugin's
+ * entire system prompt and tool schema budget. A handful of matches could
+ * exhaust a model's context window before it had read any of them.
+ *
+ * The timecodes are dropped rather than truncated, because a partial array is
+ * worse than none: it looks complete and silently is not. `getTranscript` and
+ * `searchTranscript` exist to fetch content for one video, and the count is
+ * kept so the model knows the data is there to ask for.
  */
 function truncateTranscripts(transcripts: any[]): any[] {
-  return transcripts.map((transcript) => ({
-    ...transcript,
-    fullTranscript: truncateText(transcript.fullTranscript, TRANSCRIPT_PREVIEW_LENGTH),
-  }));
+  return transcripts.map((transcript) => {
+    const { transcriptWithTimeCodes, ...rest } = transcript;
+
+    return {
+      ...rest,
+      fullTranscript: truncateText(transcript.fullTranscript, TRANSCRIPT_PREVIEW_LENGTH),
+      segmentCount: Array.isArray(transcriptWithTimeCodes) ? transcriptWithTimeCodes.length : 0,
+    };
+  });
 }
 
 async function execute(args: unknown, strapi: Core.Strapi): Promise<unknown> {
@@ -119,7 +136,7 @@ async function execute(args: unknown, strapi: Core.Strapi): Promise<unknown> {
       videoId: videoId || null,
       title: title || null,
     },
-    ...(!includeFullContent && { note: 'Transcript content truncated to 244 chars. Use getTranscript for full content or set includeFullContent=true.' }),
+    ...(!includeFullContent && { note: "Search results only: transcript text is truncated to 244 chars and timecodes are omitted. Use getTranscript for one video's full content, searchTranscript to find a passage within one, or set includeFullContent=true to get everything here." }),
   };
 }
 
