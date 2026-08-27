@@ -1,18 +1,21 @@
 {
-  "name": "strapi-plugin-ai-sdk-yt-transcripts",
-  "version": "1.2.0",
-  "description": "AI SDK extension plugin for YouTube transcript tools",
+  "name": "strapi-plugin-youtube-transcripts",
+  "version": "1.3.0",
+  "description": "Fetch, store, search and read YouTube transcripts in Strapi. Works on its own, and exposes AI tools when strapi-plugin-ai-sdk is installed.",
   "license": "MIT",
   "author": "Paul Brats <codingafterthirty@gmail.com>",
   "type": "commonjs",
   "keywords": [
-    "strapi-plugin-ai-sdk-yt-transcripts",
     "strapi",
-    "plugin",
-    "ai-sdk",
+    "strapi-plugin",
     "youtube",
     "transcript",
-    "ai"
+    "transcripts",
+    "captions",
+    "subtitles",
+    "video",
+    "ai",
+    "mcp"
   ],
   "exports": {
     "./package.json": "./package.json",
@@ -69,7 +72,7 @@
     "vitest": "^3.2.7"
   },
   "peerDependencies": {
-    "strapi-plugin-ai-sdk": "^1.1.0",
+    "strapi-plugin-ai-sdk": "^2.0.0",
     "@strapi/sdk-plugin": "^5.3.2",
     "@strapi/strapi": "^5.47.0",
     "react": "^18.3.1",
@@ -89,8 +92,8 @@
   "strapi": {
     "kind": "plugin",
     "name": "ai-sdk-yt-transcripts",
-    "displayName": "AI SDK: Transcripts",
-    "description": "YouTube transcript tools for the AI SDK plugin"
+    "displayName": "YouTube Transcripts",
+    "description": "Fetch, store, search and read YouTube transcripts. Adds AI tools when the ai-sdk plugin is present."
   },
   "publishConfig": {
     "access": "public"
