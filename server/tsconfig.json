@@ -5,7 +5,6 @@
   ],
   "compilerOptions": {
     "rootDir": "../",
-    "module": "nodenext",
-    "moduleResolution": "nodenext"
+    "ignoreDeprecations": "5.0"
   }
 }
