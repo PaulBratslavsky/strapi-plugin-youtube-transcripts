@@ -1,6 +1,6 @@
 {
   "name": "strapi-plugin-youtube-transcripts",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Fetch, store, search and read YouTube transcripts in Strapi. Works on its own, and exposes AI tools when strapi-plugin-ai-sdk is installed.",
   "license": "MIT",
   "author": "Paul Brats <codingafterthirty@gmail.com>",
@@ -72,16 +72,16 @@
     "vitest": "^3.2.7"
   },
   "peerDependencies": {
-    "strapi-plugin-ai-sdk": "^2.0.0",
     "@strapi/sdk-plugin": "^5.3.2",
     "@strapi/strapi": "^5.47.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
-    "styled-components": "^6.1.13"
+    "styled-components": "^6.1.13",
+    "strapi-plugin-ai-chat": "^3.0.0"
   },
   "peerDependenciesMeta": {
-    "strapi-plugin-ai-sdk": {
+    "strapi-plugin-ai-chat": {
       "optional": true
     }
   },

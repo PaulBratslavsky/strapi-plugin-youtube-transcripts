@@ -31,7 +31,7 @@ transcript plugin behind.
 - Strapi >= 5.47.0
 - Node.js 18+
 
-`strapi-plugin-ai-sdk` is an **optional** peer. Install it only if you want the
+`strapi-plugin-ai-chat` is an **optional** peer. Install it only if you want the
 AI tooling; the plugin runs without it.
 
 ## Installation
@@ -49,7 +49,7 @@ export default ({ env }) => ({
   // The ai-sdk plugin must be configured first
   "ai-sdk": {
     enabled: true,
-    resolve: "strapi-plugin-ai-sdk",
+    resolve: "strapi-plugin-ai-chat",
     config: {
       anthropicApiKey: env("ANTHROPIC_API_KEY"),
     },
@@ -196,7 +196,7 @@ cost rather than a database write.
 └──────────────┬───────────────────────┘
                │
 ┌──────────────▼───────────────────────┐
-│  strapi-plugin-ai-sdk                │
+│  strapi-plugin-ai-chat                │
 │  ┌─────────────────────────────────┐ │
 │  │  Tool Registry                  │ │
 │  │  ├── built-in tools             │ │

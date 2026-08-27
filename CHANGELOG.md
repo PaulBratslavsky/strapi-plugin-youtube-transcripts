@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.1.1 - 2026-08-27
+
+Fixes the peer dependency, which named a package that no longer receives
+updates. It was `strapi-plugin-ai-sdk@^2.0.0`; that package is frozen at 2.6.0
+under a name the hub plugin has since left behind, and the range excluded the
+current release anyway. It is now `strapi-plugin-ai-chat@^3.0.0`, still optional
+because this plugin works standalone and only exposes AI tools when the hub is
+installed.
+
+Also adds `repository`, `homepage` and `bugs`, which were missing entirely, so
+npm had no link back to the source, and updates the README's references to the
+hub's old name.
+
 ## 2.1.0 - 2026-08-27
 
 Captures the video metadata that was already being fetched and thrown away.
