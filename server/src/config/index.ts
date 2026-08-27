@@ -5,6 +5,10 @@ export default {
     previewLength: 500, // Default preview length in characters
     maxFullTranscriptLength: 50000, // Auto-load full transcript if under this character count (~12K tokens)
     searchSegmentSeconds: 30, // Segment size for BM25 search scoring
+    // Refetch metadata for transcripts stored before 2.1, which kept only the
+    // title and the text. Off by default: it talks to YouTube once per stored
+    // video, which is not something to start on someone's behalf at boot.
+    backfillMetadata: false,
   },
   validator(config: {
     proxyUrl?: string;

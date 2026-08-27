@@ -8,11 +8,69 @@ export interface TranscriptSegment {
   duration: number;
 }
 
+/**
+ * Everything worth keeping about a video, not just its words.
+ *
+ * All of this arrives in the same `getBasicInfo` response the transcript fetch
+ * already makes, so capturing it costs no extra request. Only the title was
+ * being read; the rest was discarded, which meant a stored transcript could not
+ * say who published it, how long it ran, or what it looked like.
+ *
+ * Session-specific flags in that response (is_liked, is_owner_viewing and
+ * friends) are deliberately left out: they describe the account doing the
+ * fetching rather than the video, so storing them would be misleading.
+ */
 export interface TranscriptData {
   videoId: string;
   title?: string;
   fullTranscript: string;
   transcriptWithTimeCodes: TranscriptSegment[];
+
+  author?: string | null;
+  channelId?: string | null;
+  thumbnailUrl?: string | null;
+  durationSec?: number | null;
+  description?: string | null;
+  keywords?: string[] | null;
+  category?: string | null;
+  videoPublishedAt?: string | null;
+  language?: string | null;
+  /** When this plugin captured it, so a stale transcript is identifiable. */
+  fetchedAt?: string;
+}
+
+/**
+ * The largest thumbnail YouTube offers.
+ *
+ * The array is ordered widest first, but that is not contractual, so pick by
+ * width rather than trusting position.
+ */
+function bestThumbnail(thumbnails: unknown): string | null {
+  if (!Array.isArray(thumbnails) || thumbnails.length === 0) return null;
+
+  const best = thumbnails.reduce((a: any, b: any) => ((b?.width ?? 0) > (a?.width ?? 0) ? b : a));
+  return best?.url ?? null;
+}
+
+/** Pull the video metadata out of a getBasicInfo response. */
+function extractMetadata(info: any, captionLanguage?: string | null) {
+  const b = info?.basic_info ?? {};
+
+  return {
+    author: b.author ?? null,
+    channelId: b.channel_id ?? null,
+    thumbnailUrl: bestThumbnail(b.thumbnail),
+    durationSec: typeof b.duration === 'number' ? b.duration : null,
+    description: b.short_description ?? null,
+    keywords: Array.isArray(b.keywords) ? b.keywords : null,
+    category: b.category ?? null,
+    // Named videoPublishedAt, not publishedAt: Strapi reserves that name for
+    // draft-and-publish state, so a custom field of the same name is never the
+    // value you set and is never null.
+    videoPublishedAt: info?.primary_info?.published?.text ?? null,
+    language: captionLanguage ?? null,
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 export interface FetchOptions {
@@ -364,6 +422,9 @@ async function fetchTranscriptFromYouTube(
     title,
     fullTranscript: segments.map((s) => s.text).join(' '),
     transcriptWithTimeCodes: segments,
+    // The language of the track actually used, not the list of what was on
+    // offer, so a stored transcript says which one it is.
+    ...extractMetadata(info, englishTrack.language_code),
   };
 }
 

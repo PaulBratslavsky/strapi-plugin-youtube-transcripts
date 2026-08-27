@@ -110,6 +110,8 @@ async function execute(args: unknown, strapi: Core.Strapi): Promise<unknown> {
   }
 
   const payload: Record<string, unknown> = {
+    // Spread so metadata the fetch gains is stored without editing this again.
+    ...transcriptData,
     videoId,
     title: transcriptData.title || `YouTube Video ${videoId}`,
     fullTranscript: transcriptData.fullTranscript,

@@ -34,6 +34,8 @@ const controller = ({ strapi }: { strapi: Core.Strapi }) => ({
       }
 
       const payload = {
+        // Spread so metadata the fetch gains is stored without editing this again.
+        ...transcriptData,
         videoId,
         title: transcriptData.title || 'No title found',
         fullTranscript: transcriptData.fullTranscript,
