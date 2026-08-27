@@ -7,7 +7,7 @@ Give it a video URL and it pulls the transcript, stores it as a Strapi content
 type, and gives you an admin page plus a REST API to search and read it. There
 is no AI requirement and nothing to configure beyond enabling the plugin.
 
-If [`strapi-plugin-ai-sdk`](https://github.com/PaulBratslavsky/strapi-plugin-ai-sdk)
+If [`strapi-plugin-ai-chat`](https://github.com/PaulBratslavsky/strapi-plugin-ai-chat)
 happens to be installed, this plugin's five tools are discovered automatically
 and become available to the admin AI chat and to Strapi's built-in MCP server.
 That is additive. Nothing here depends on it, and removing it leaves a working

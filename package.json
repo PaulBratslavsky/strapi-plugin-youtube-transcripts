@@ -97,5 +97,13 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PaulBratslavsky/strapi-plugin-youtube-transcripts.git"
+  },
+  "homepage": "https://github.com/PaulBratslavsky/strapi-plugin-youtube-transcripts#readme",
+  "bugs": {
+    "url": "https://github.com/PaulBratslavsky/strapi-plugin-youtube-transcripts/issues"
   }
 }
