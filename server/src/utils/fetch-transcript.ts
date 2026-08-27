@@ -8,11 +8,69 @@ export interface TranscriptSegment {
   duration: number;
 }
 
+/**
+ * Everything worth keeping about a video, not just its words.
+ *
+ * All of this arrives in the same `getBasicInfo` response the transcript fetch
+ * already makes, so capturing it costs no extra request. Only the title was
+ * being read; the rest was discarded, which meant a stored transcript could not
+ * say who published it, how long it ran, or what it looked like.
+ *
+ * Session-specific flags in that response (is_liked, is_owner_viewing and
+ * friends) are deliberately left out: they describe the account doing the
+ * fetching rather than the video, so storing them would be misleading.
+ */
 export interface TranscriptData {
   videoId: string;
   title?: string;
   fullTranscript: string;
   transcriptWithTimeCodes: TranscriptSegment[];
+
+  author?: string | null;
+  channelId?: string | null;
+  thumbnailUrl?: string | null;
+  durationSec?: number | null;
+  description?: string | null;
+  keywords?: string[] | null;
+  category?: string | null;
+  videoPublishedAt?: string | null;
+  language?: string | null;
+  /** When this plugin captured it, so a stale transcript is identifiable. */
+  fetchedAt?: string;
+}
+
+/**
+ * The largest thumbnail YouTube offers.
+ *
+ * The array is ordered widest first, but that is not contractual, so pick by
+ * width rather than trusting position.
+ */
+function bestThumbnail(thumbnails: unknown): string | null {
+  if (!Array.isArray(thumbnails) || thumbnails.length === 0) return null;
+
+  const best = thumbnails.reduce((a: any, b: any) => ((b?.width ?? 0) > (a?.width ?? 0) ? b : a));
+  return best?.url ?? null;
+}
+
+/** Pull the video metadata out of a getBasicInfo response. */
+function extractMetadata(info: any, captionLanguage?: string | null) {
+  const b = info?.basic_info ?? {};
+
+  return {
+    author: b.author ?? null,
+    channelId: b.channel_id ?? null,
+    thumbnailUrl: bestThumbnail(b.thumbnail),
+    durationSec: typeof b.duration === 'number' ? b.duration : null,
+    description: b.short_description ?? null,
+    keywords: Array.isArray(b.keywords) ? b.keywords : null,
+    category: b.category ?? null,
+    // Named videoPublishedAt, not publishedAt: Strapi reserves that name for
+    // draft-and-publish state, so a custom field of the same name is never the
+    // value you set and is never null.
+    videoPublishedAt: info?.primary_info?.published?.text ?? null,
+    language: captionLanguage ?? null,
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 export interface FetchOptions {
@@ -109,13 +167,13 @@ function createProxyFetch(proxyUrl?: string): typeof fetch | undefined {
 
     // Log request details
     const urlPath = new URL(url).pathname;
-    console.log(`[ai-sdk-yt-transcripts] Proxy ${method} ${urlPath} via ${maskedProxyUrl}`);
+    console.log(`[youtube-transcripts] Proxy ${method} ${urlPath} via ${maskedProxyUrl}`);
 
     const response = await undiciFetch(url, options);
 
     // Log response status
     if (!response.ok) {
-      console.log(`[ai-sdk-yt-transcripts] Proxy response: ${response.status} ${response.statusText}`);
+      console.log(`[youtube-transcripts] Proxy response: ${response.status} ${response.statusText}`);
     }
 
     return response;
@@ -251,9 +309,9 @@ async function fetchTranscriptFromYouTube(
   // Log proxy status for debugging
   if (options?.proxyUrl) {
     const maskedUrl = options.proxyUrl.replace(/:([^@:]+)@/, ':****@');
-    console.log(`[ai-sdk-yt-transcripts] Fetching video ${videoId} via proxy: ${maskedUrl}`);
+    console.log(`[youtube-transcripts] Fetching video ${videoId} via proxy: ${maskedUrl}`);
   } else {
-    console.log(`[ai-sdk-yt-transcripts] Fetching video ${videoId} without proxy`);
+    console.log(`[youtube-transcripts] Fetching video ${videoId} without proxy`);
   }
 
   // 1. Create Innertube client with optional proxy
@@ -276,9 +334,9 @@ async function fetchTranscriptFromYouTube(
   const playabilityStatus = (info as any).playability_status;
 
   // Log detailed info for debugging
-  console.log(`[ai-sdk-yt-transcripts] Video ${videoId} - Title: ${info.basic_info?.title || 'Unknown'}`);
-  console.log(`[ai-sdk-yt-transcripts] Video ${videoId} - Playability: ${playabilityStatus?.status || 'Unknown'}`);
-  console.log(`[ai-sdk-yt-transcripts] Video ${videoId} - Caption tracks found: ${captionTracks?.length || 0}`);
+  console.log(`[youtube-transcripts] Video ${videoId} - Title: ${info.basic_info?.title || 'Unknown'}`);
+  console.log(`[youtube-transcripts] Video ${videoId} - Playability: ${playabilityStatus?.status || 'Unknown'}`);
+  console.log(`[youtube-transcripts] Video ${videoId} - Caption tracks found: ${captionTracks?.length || 0}`);
 
   if (!captionTracks || captionTracks.length === 0) {
     // Check playability status for more details
@@ -286,13 +344,13 @@ async function fetchTranscriptFromYouTube(
     const reason = playabilityStatus?.reason;
     const subreason = playabilityStatus?.messages?.[0] || playabilityStatus?.subreason;
 
-    console.log(`[ai-sdk-yt-transcripts] Video ${videoId} - No captions found`);
-    console.log(`[ai-sdk-yt-transcripts] Video ${videoId} - Playability status: ${status || 'Unknown'}`);
+    console.log(`[youtube-transcripts] Video ${videoId} - No captions found`);
+    console.log(`[youtube-transcripts] Video ${videoId} - Playability status: ${status || 'Unknown'}`);
     if (reason) {
-      console.log(`[ai-sdk-yt-transcripts] Video ${videoId} - Playability reason: ${reason}`);
+      console.log(`[youtube-transcripts] Video ${videoId} - Playability reason: ${reason}`);
     }
     if (subreason) {
-      console.log(`[ai-sdk-yt-transcripts] Video ${videoId} - Playability subreason: ${subreason}`);
+      console.log(`[youtube-transcripts] Video ${videoId} - Playability subreason: ${subreason}`);
     }
 
     // Check for various error conditions
@@ -318,9 +376,9 @@ async function fetchTranscriptFromYouTube(
 
     // Check if captions object exists but is empty
     if (info.captions) {
-      console.log(`[ai-sdk-yt-transcripts] Video ${videoId} - Captions object exists but no tracks available`);
+      console.log(`[youtube-transcripts] Video ${videoId} - Captions object exists but no tracks available`);
     } else {
-      console.log(`[ai-sdk-yt-transcripts] Video ${videoId} - No captions object in response`);
+      console.log(`[youtube-transcripts] Video ${videoId} - No captions object in response`);
     }
 
     throw new Error(
@@ -333,7 +391,7 @@ async function fetchTranscriptFromYouTube(
 
   // Log available caption languages
   const availableLanguages = captionTracks.map((t) => `${t.language_code}${t.kind === 'asr' ? ' (auto)' : ''}`);
-  console.log(`[ai-sdk-yt-transcripts] Video ${videoId} - Available languages: ${availableLanguages.join(', ')}`);
+  console.log(`[youtube-transcripts] Video ${videoId} - Available languages: ${availableLanguages.join(', ')}`);
 
   // 4. Find English caption track (prefer non-ASR if available)
   const englishTrack =
@@ -346,7 +404,7 @@ async function fetchTranscriptFromYouTube(
   }
 
   // 5. Fetch timedtext XML
-  console.log(`[ai-sdk-yt-transcripts] Video ${videoId} - Fetching caption track: ${englishTrack.language_code}`);
+  console.log(`[youtube-transcripts] Video ${videoId} - Fetching caption track: ${englishTrack.language_code}`);
   const xml = await fetchTimedTextXml(englishTrack.base_url, proxyFetch);
 
   // 6. Parse XML to segments
@@ -357,13 +415,16 @@ async function fetchTranscriptFromYouTube(
   }
 
   const transcriptLength = segments.map((s) => s.text).join(' ').length;
-  console.log(`[ai-sdk-yt-transcripts] Video ${videoId} - Success! ${segments.length} segments, ${transcriptLength} chars`);
+  console.log(`[youtube-transcripts] Video ${videoId} - Success! ${segments.length} segments, ${transcriptLength} chars`);
 
   return {
     videoId,
     title,
     fullTranscript: segments.map((s) => s.text).join(' '),
     transcriptWithTimeCodes: segments,
+    // The language of the track actually used, not the list of what was on
+    // offer, so a stored transcript says which one it is.
+    ...extractMetadata(info, englishTrack.language_code),
   };
 }
 

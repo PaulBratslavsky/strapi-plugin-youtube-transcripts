@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { extractYouTubeID } from '../utils/extract-youtube-id';
 import type { ToolDefinition } from './index';
 
-const PLUGIN_ID = 'ai-sdk-yt-transcripts';
+const PLUGIN_ID = 'youtube-transcripts';
 
 interface PluginConfig {
   previewLength?: number;
@@ -94,7 +94,7 @@ async function execute(args: unknown, strapi: Core.Strapi): Promise<unknown> {
     throw new Error(`Invalid YouTube video ID or URL: "${videoIdOrUrl}". Please provide a valid 11-character video ID or YouTube URL.`);
   }
 
-  const service = strapi.plugin(PLUGIN_ID).service('service');
+  const service = strapi.plugin(PLUGIN_ID).service('transcript');
 
   // Check if transcript already exists in database
   const existingTranscript = await service.findTranscript(videoId);
@@ -110,6 +110,8 @@ async function execute(args: unknown, strapi: Core.Strapi): Promise<unknown> {
   }
 
   const payload: Record<string, unknown> = {
+    // Spread so metadata the fetch gains is stored without editing this again.
+    ...transcriptData,
     videoId,
     title: transcriptData.title || `YouTube Video ${videoId}`,
     fullTranscript: transcriptData.fullTranscript,

@@ -1,44 +1,43 @@
-# Strapi Plugin: AI SDK Transcripts
+# YouTube Transcripts for Strapi
 
-Extension plugin for [strapi-plugin-ai-sdk](https://github.com/PaulBratslavsky/strapi-plugin-ai-sdk) that adds YouTube transcript tools to the Strapi admin AI chat.
+Fetch, store, search and read YouTube transcripts inside Strapi. It works on its
+own, and it grows AI tools when you have them.
 
-Fetch, search, and browse YouTube transcripts directly from the Strapi admin chat. Tools are registered with the ai-sdk's tool registry at boot time, so they're available in admin chat, public chat, and on the ai-sdk's MCP server automatically.
+Give it a video URL and it pulls the transcript, stores it as a Strapi content
+type, and gives you an admin page plus a REST API to search and read it. There
+is no AI requirement and nothing to configure beyond enabling the plugin.
+
+If [`strapi-plugin-ai-sdk`](https://github.com/PaulBratslavsky/strapi-plugin-ai-sdk)
+happens to be installed, this plugin's five tools are discovered automatically
+and become available to the admin AI chat and to Strapi's built-in MCP server.
+That is additive. Nothing here depends on it, and removing it leaves a working
+transcript plugin behind.
+
+## What you get
+
+- **Transcript store.** A `transcript` content type holding the full text plus
+  per-segment timecodes, so a fetched video is fetched once.
+- **Admin page.** Browse and inspect what has been captured.
+- **REST API.** Content-API routes for your own frontend.
+- **Search.** BM25 relevance scoring over segments, returning matching passages
+  with timestamps rather than the whole transcript.
+- **Pagination.** Long transcripts are chunked, so a two hour video does not
+  arrive as one wall of text.
+- **AI tools, when available.** `fetchTranscript`, `getTranscript`,
+  `searchTranscript`, `listTranscripts` and `findTranscripts`.
 
 ## Requirements
 
 - Strapi >= 5.47.0
-- `strapi-plugin-ai-sdk` ^1.1.0 (must be installed and enabled)
 - Node.js 18+
 
-> **Peer dependency note:** `strapi-plugin-ai-sdk` is declared as a
-> `peerDependency` at `^1.1.0` because that's genuinely the version this
-> plugin requires — but `1.1.0` has not been published to npm yet (the
-> registry currently tops out at `0.10.0`). It's marked
-> `optional: true` in `peerDependenciesMeta` so `npm install` doesn't try to
-> auto-install a version that doesn't exist and fail with `notarget`. This
-> plugin still won't function without the hub actually installed and
-> enabled — `optional` only affects npm's install-time resolution, not the
-> runtime requirement. Once `strapi-plugin-ai-sdk@1.1.0` is published, this
-> starts resolving normally; the `optional` flag can be removed at that
-> point if you want npm to auto-install it again, but leaving it in place
-> is also safe going forward.
-
-As of `v1.1.0`, this plugin's tools reach external AI clients through
-Strapi's own official MCP server at `/mcp` (not a plugin-owned endpoint).
-That requires the host app to set `mcp: { enabled: true }` in its own
-`config/server.ts`, and the connecting Admin API token's role to be granted
-`plugin::ai-sdk.mcp.read` (for `getTranscript`, `searchTranscript`, `listTranscripts`, `findTranscripts`)
-or `plugin::ai-sdk.mcp.maintenance` (required by `fetchTranscript`, which hits YouTube
-directly and persists transcripts, triggering downstream OpenAI embedding operations in the
-sibling yt-embeddings plugin — the salient risk is external cost, not just the database write,
-so it tiers as `maintenance` rather than `write`).
-See [`strapi-plugin-ai-sdk`'s plugin contract](https://github.com/PaulBratslavsky/strapi-plugin-ai-sdk/blob/main/docs/plugin-contract.md)
-for the full permission-tier and namespacing details.
+`strapi-plugin-ai-sdk` is an **optional** peer. Install it only if you want the
+AI tooling; the plugin runs without it.
 
 ## Installation
 
 ```bash
-npm install strapi-plugin-ai-sdk-yt-transcripts
+npm install strapi-plugin-youtube-transcripts
 ```
 
 ## Configuration
@@ -58,7 +57,7 @@ export default ({ env }) => ({
 
   "ai-sdk-yt-transcripts": {
     enabled: true,
-    resolve: "strapi-plugin-ai-sdk-yt-transcripts",
+    resolve: "strapi-plugin-youtube-transcripts",
     config: {
       proxyUrl: env("PROXY_URL"),           // Optional: HTTP/HTTPS proxy for YouTube requests
       chunkSizeSeconds: 300,                // Chunk size for transcript pagination (default: 5 min)
@@ -94,7 +93,7 @@ This plugin registers 5 tools with the ai-sdk tool registry:
 
 All tools accept YouTube video IDs (`dQw4w9WgXcQ`) or full URLs (`https://youtube.com/watch?v=dQw4w9WgXcQ`).
 
-All tools are marked `publicSafe: true`, so they're also available in the public chat widget.
+All tools are marked `publicSafe: true`, which tiers them as read-only for permission purposes. `fetchTranscript` is the exception in practice, since it reaches YouTube and writes.
 
 ### fetchTranscript
 
@@ -176,7 +175,18 @@ export default () => ({
 });
 ```
 
-Once discovered, the ai-sdk handles the rest — tools are available in admin chat, public chat (since all are `publicSafe`), and, when the host has MCP enabled (Strapi >= 5.47 with `mcp: { enabled: true }`) and the connecting token grants the appropriate tier permission, exposed via Strapi's official `/mcp` endpoint as snake_case names. Read-tier tools like `ai_sdk_yt_transcripts__get_transcript` require `plugin::ai-sdk.mcp.read`, while `ai_sdk_yt_transcripts__fetch_transcript` requires `plugin::ai-sdk.mcp.maintenance` (it hits YouTube and cascades into a paid embedding run, not just a database write).
+Once discovered, ai-sdk handles the rest. The tools become available in the
+admin AI chat and, when the host enables Strapi's MCP server
+(`mcp: { enabled: true }` in `config/server.ts`), over `/mcp` under snake_case
+names such as `ai_sdk_yt_transcripts__get_transcript`.
+
+Each tool has its own permission, `plugin::ai-sdk-yt-transcripts.tool.<slug>`,
+which appears under this plugin's own section of **Settings > Roles**. Granted
+on a role it decides what an admin's chat can use; granted on an admin token it
+decides what that token exposes over MCP. `fetchTranscript` is the one to grant
+deliberately: it calls YouTube and persists a transcript, which can cascade into
+a paid embedding run in the sibling embeddings plugin, so the risk is external
+cost rather than a database write.
 
 ### Architecture
 
@@ -199,7 +209,7 @@ Once discovered, the ai-sdk handles the rest — tools are available in admin ch
 └──────────────────────────────────────┘
 
 ┌──────────────────────────────────────┐
-│  strapi-plugin-ai-sdk-yt-transcripts    │
+│  strapi-plugin-youtube-transcripts     │
 │  ├── ai-tools service (5 tools)      │
 │  ├── REST API (GET /yt-transcript/)  │
 │  ├── Transcript content type         │

@@ -1,8 +1,9 @@
 import type { Core } from '@strapi/strapi';
 import fetchTranscript from '../utils/fetch-transcript';
+import { backfillMetadata } from '../lib/backfill-metadata';
 
-const PLUGIN_ID = 'ai-sdk-yt-transcripts';
-const CONTENT_TYPE_UID = 'plugin::ai-sdk-yt-transcripts.transcript';
+const PLUGIN_ID = 'youtube-transcripts';
+const CONTENT_TYPE_UID = 'plugin::youtube-transcripts.transcript';
 
 interface PluginConfig {
   proxyUrl?: string;
@@ -52,17 +53,26 @@ const service = ({ strapi }: { strapi: Core.Strapi }) => ({
 
     strapi.log.info(`[${PLUGIN_ID}] Successfully fetched transcript for ${identifier}`);
 
-    return {
-      title: transcriptData.title,
-      fullTranscript: transcriptData.fullTranscript,
-      transcriptWithTimeCodes: transcriptData.transcriptWithTimeCodes,
-    };
+      // Return everything the fetch produced. Listing fields individually is
+      // exactly what dropped the metadata: the fetch had it and the service
+      // quietly narrowed it back down to three.
+      return transcriptData;
   },
 
   async saveTranscript(payload: Record<string, unknown>) {
     return await strapi.documents(CONTENT_TYPE_UID as any).create({
       data: payload,
     });
+  },
+
+  /**
+   * Refetch metadata for rows stored before 2.1. Metadata only: the stored
+   * transcript is never replaced, because captions can change or disappear and
+   * a silent downgrade would be worse than a null thumbnail.
+   */
+  async backfillMetadata(options?: { limit?: number }) {
+    const config = strapi.config.get(`plugin::${PLUGIN_ID}`) as { proxyUrl?: string } | undefined;
+    return backfillMetadata(strapi, { proxyUrl: config?.proxyUrl, limit: options?.limit });
   },
 
   async findTranscript(videoId: string) {

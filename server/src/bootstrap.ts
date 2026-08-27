@@ -1,7 +1,8 @@
 import type { Core } from '@strapi/strapi';
 import { ProxyAgent, fetch as undiciFetch } from 'undici';
+import { backfillMetadata } from './lib/backfill-metadata';
 
-const PLUGIN_ID = 'ai-sdk-yt-transcripts';
+const PLUGIN_ID = 'youtube-transcripts';
 
 interface PluginConfig {
   proxyUrl?: string;
@@ -54,6 +55,16 @@ const bootstrap = async ({ strapi }: { strapi: Core.Strapi }) => {
     });
   } else {
     strapi.log.warn(`[${PLUGIN_ID}] No proxy configured - YouTube may block requests. Set PROXY_URL in .env`);
+  }
+
+  // Opt-in only. Runs after boot rather than during it, because it makes one
+  // network call per stored video and a slow YouTube must not delay the app.
+  const cfg = strapi.config.get(`plugin::${PLUGIN_ID}`) as { backfillMetadata?: boolean; proxyUrl?: string } | undefined;
+  if (cfg?.backfillMetadata) {
+    strapi.log.info(`[${PLUGIN_ID}] backfillMetadata is enabled, refetching metadata for stored transcripts`);
+    void backfillMetadata(strapi, { proxyUrl: cfg.proxyUrl }).catch((error) => {
+      strapi.log.warn(`[${PLUGIN_ID}] backfill did not complete: ${(error as Error).message}`);
+    });
   }
 };
 

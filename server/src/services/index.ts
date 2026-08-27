@@ -1,7 +1,7 @@
-import service from './service';
+import transcript from './transcript';
 import aiTools from './ai-tools';
 
 export default {
-  service,
+  transcript,
   'ai-tools': aiTools,
 };

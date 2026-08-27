@@ -1,6 +1,6 @@
 {
   "kind": "collectionType",
-  "collectionName": "transcript",
+  "collectionName": "youtube_transcripts",
   "info": {
     "singularName": "transcript",
     "pluralName": "transcripts",
@@ -17,22 +17,48 @@
       "visible": true
     }
   },
-
   "attributes": {
     "title": {
       "type": "string"
     },
-
     "videoId": {
       "type": "string"
     },
-
     "fullTranscript": {
       "type": "richtext"
     },
-
     "transcriptWithTimeCodes": {
       "type": "json"
+    },
+    "author": {
+      "type": "string"
+    },
+    "channelId": {
+      "type": "string"
+    },
+    "thumbnailUrl": {
+      "type": "string"
+    },
+    "durationSec": {
+      "type": "integer"
+    },
+    "description": {
+      "type": "text"
+    },
+    "keywords": {
+      "type": "json"
+    },
+    "category": {
+      "type": "string"
+    },
+    "language": {
+      "type": "string"
+    },
+    "fetchedAt": {
+      "type": "datetime"
+    },
+    "videoPublishedAt": {
+      "type": "string"
     }
   }
 }

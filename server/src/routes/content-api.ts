@@ -2,7 +2,7 @@ export default [
   {
     method: 'GET',
     path: '/yt-transcript/:videoId',
-    handler: 'controller.getTranscript',
+    handler: 'transcript.getTranscript',
     config: {
       policies: [],
     },
