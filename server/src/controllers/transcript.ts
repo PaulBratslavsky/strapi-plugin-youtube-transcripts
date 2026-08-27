@@ -1,7 +1,7 @@
 import type { Core } from '@strapi/strapi';
 import { extractYouTubeID } from '../utils/extract-youtube-id';
 
-const PLUGIN_ID = 'ai-sdk-yt-transcripts';
+const PLUGIN_ID = 'youtube-transcripts';
 
 const controller = ({ strapi }: { strapi: Core.Strapi }) => ({
   async getTranscript(ctx) {
@@ -15,7 +15,7 @@ const controller = ({ strapi }: { strapi: Core.Strapi }) => ({
       // Check if transcript exists in database
       const found = await strapi
         .plugin(PLUGIN_ID)
-        .service('service')
+        .service('transcript')
         .findTranscript(videoId);
 
       if (found) {
@@ -25,7 +25,7 @@ const controller = ({ strapi }: { strapi: Core.Strapi }) => ({
       // Fetch from YouTube
       const transcriptData = await strapi
         .plugin(PLUGIN_ID)
-        .service('service')
+        .service('transcript')
         .getTranscript(videoId);
 
       if (!transcriptData || transcriptData.error) {
@@ -43,7 +43,7 @@ const controller = ({ strapi }: { strapi: Core.Strapi }) => ({
       // Save to transcript collection
       const transcript = await strapi
         .plugin(PLUGIN_ID)
-        .service('service')
+        .service('transcript')
         .saveTranscript(payload);
 
       strapi.log.info(`[${PLUGIN_ID}] Saved transcript for ${videoId} (documentId: ${(transcript as any)?.documentId})`);

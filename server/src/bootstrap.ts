@@ -1,7 +1,7 @@
 import type { Core } from '@strapi/strapi';
 import { ProxyAgent, fetch as undiciFetch } from 'undici';
 
-const PLUGIN_ID = 'ai-sdk-yt-transcripts';
+const PLUGIN_ID = 'youtube-transcripts';
 
 interface PluginConfig {
   proxyUrl?: string;

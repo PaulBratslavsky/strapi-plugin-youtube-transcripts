@@ -1,6 +1,6 @@
 {
   "kind": "collectionType",
-  "collectionName": "transcript",
+  "collectionName": "youtube_transcripts",
   "info": {
     "singularName": "transcript",
     "pluralName": "transcripts",
@@ -17,20 +17,16 @@
       "visible": true
     }
   },
-
   "attributes": {
     "title": {
       "type": "string"
     },
-
     "videoId": {
       "type": "string"
     },
-
     "fullTranscript": {
       "type": "richtext"
     },
-
     "transcriptWithTimeCodes": {
       "type": "json"
     }

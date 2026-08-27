@@ -1,5 +1,5 @@
-import controller from './controller';
+import transcript from './transcript';
 
 export default {
-  controller,
+  transcript,
 };

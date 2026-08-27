@@ -1,8 +1,8 @@
 import type { Core } from '@strapi/strapi';
 import fetchTranscript from '../utils/fetch-transcript';
 
-const PLUGIN_ID = 'ai-sdk-yt-transcripts';
-const CONTENT_TYPE_UID = 'plugin::ai-sdk-yt-transcripts.transcript';
+const PLUGIN_ID = 'youtube-transcripts';
+const CONTENT_TYPE_UID = 'plugin::youtube-transcripts.transcript';
 
 interface PluginConfig {
   proxyUrl?: string;
