@@ -87,8 +87,16 @@ const controller = ({ strapi }: { strapi: Core.Strapi }) => ({
       ctx.body = { data: transcript };
     } catch (error: any) {
       if (error.status) throw error;
-      strapi.log.error(`[${PLUGIN_ID}] getTranscript error: ${error.message}`);
-      ctx.throw(500, error.message || 'Failed to get transcript');
+
+      const message = error?.message ?? 'Failed to get transcript';
+      const { status, reason } = classify(message);
+
+      // Log the real error, return one the caller can act on. ctx.throw(500)
+      // was hiding every reason: Koa suppresses the message on any 5xx, so a
+      // missing-captions video and a YouTube refusal both arrived as a bare
+      // "Internal Server Error".
+      strapi.log.error(`[${PLUGIN_ID}] getTranscript failed (${status}): ${message}`);
+      ctx.throw(status, `${reason} (${message})`);
     }
   },
 });
