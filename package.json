@@ -1,6 +1,6 @@
 {
   "name": "strapi-plugin-youtube-transcripts",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Fetch, store, search and read YouTube transcripts in Strapi. Works on its own, and exposes AI tools when strapi-plugin-ai-sdk is installed.",
   "license": "MIT",
   "author": "Paul Brats <codingafterthirty@gmail.com>",
@@ -46,7 +46,9 @@
     "test:ts:front": "npx tsc -p admin/tsconfig.json --noEmit",
     "test:ts:back": "npx tsc -p server/tsconfig.json --noEmit",
     "test:unit": "vitest run",
-    "test:unit:watch": "vitest"
+    "test:unit:watch": "vitest",
+    "test:browser": "playwright test",
+    "test:browser:headed": "playwright test --headed"
   },
   "dependencies": {
     "@strapi/design-system": "^2.0.0-rc.12",
@@ -57,6 +59,7 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@strapi/sdk-plugin": "^5.3.2",
     "@strapi/strapi": "^5.47.0",
     "@strapi/typescript-utils": "^5.47.0",
@@ -77,8 +80,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
-    "styled-components": "^6.1.13",
-    "strapi-plugin-ai-chat": "^3.0.0"
+    "strapi-plugin-ai-chat": "^3.0.0",
+    "styled-components": "^6.1.13"
   },
   "peerDependenciesMeta": {
     "strapi-plugin-ai-chat": {
