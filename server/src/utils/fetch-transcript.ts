@@ -270,29 +270,86 @@ function parseTimedTextXml(xml: string): TranscriptSegment[] {
 /**
  * Fetch timedtext XML from caption URL
  */
-async function fetchTimedTextXml(
+/**
+ * How many times to ask for the caption track before giving up.
+ *
+ * This request fails intermittently and the failure is not deterministic: three
+ * identical calls, seconds apart, produced a 1.4s success, a 36.5s success and
+ * a 40.8s failure. YouTube rate limits large caption downloads, hardest from a
+ * residential address, and a single attempt turned a transient refusal into a
+ * failed fetch the caller had to notice and repeat by hand.
+ */
+const TIMEDTEXT_ATTEMPTS = 3;
+
+/** Wait between attempts, growing so a rate limit has time to clear. */
+const RETRY_BACKOFF_MS = [1000, 3000];
+
+/** A per-attempt ceiling, so one hung request cannot consume the whole budget. */
+const TIMEDTEXT_TIMEOUT_MS = 25_000;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function fetchTimedTextOnce(
   captionUrl: string,
   proxyFetch?: typeof fetch
 ): Promise<string> {
   const fetchFn = proxyFetch || fetch;
-  const response = await fetchFn(captionUrl, {
-    headers: {
-      'Accept-Language': 'en-US,en;q=0.9',
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    },
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEDTEXT_TIMEOUT_MS);
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch timedtext: ${response.status}`);
+  try {
+    const response = await fetchFn(captionUrl, {
+      signal: controller.signal,
+      headers: {
+        'Accept-Language': 'en-US,en;q=0.9',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch timedtext: ${response.status}`);
+    }
+
+    const xml = await response.text();
+    if (!xml || xml.length === 0) {
+      throw new Error('Empty timedtext response');
+    }
+
+    return xml;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchTimedTextXml(
+  captionUrl: string,
+  proxyFetch?: typeof fetch
+): Promise<string> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= TIMEDTEXT_ATTEMPTS; attempt += 1) {
+    try {
+      return await fetchTimedTextOnce(captionUrl, proxyFetch);
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+
+      if (attempt === TIMEDTEXT_ATTEMPTS) break;
+
+      const wait = RETRY_BACKOFF_MS[attempt - 1] ?? 3000;
+      console.log(
+        `[youtube-transcripts] caption fetch attempt ${attempt}/${TIMEDTEXT_ATTEMPTS} failed ` +
+          `(${message}); retrying in ${wait}ms`,
+      );
+      await sleep(wait);
+    }
   }
 
-  const xml = await response.text();
-  if (!xml || xml.length === 0) {
-    throw new Error('Empty timedtext response');
-  }
-
-  return xml;
+  throw new Error(
+    `Caption download failed after ${TIMEDTEXT_ATTEMPTS} attempts. ` +
+      `Last error: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+  );
 }
 
 /**

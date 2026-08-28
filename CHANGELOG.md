@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.2.0 - 2026-08-28
+
+Makes the caption download survive YouTube refusing it, and stops the API route
+hiding why a fetch failed.
+
+**Retries.** Fetching the caption track failed intermittently and a single
+attempt turned that into a failed fetch. The failure is not deterministic:
+three identical calls seconds apart produced a 1.4s success, a 36.5s success and
+a 40.8s failure. YouTube rate limits large caption downloads, hardest from a
+residential address, and one refusal was enough to lose the transcript.
+
+Three attempts now, with 1s then 3s of backoff, and a 25s ceiling per attempt so
+one hung request cannot consume the whole budget. Measured on the transcript
+that was failing: five consecutive direct fetches, no proxy, five successes,
+where the same video previously failed one run in three.
+
+**The API route reported nothing.** Every failure came back as
+`ctx.throw(500, message)`, and Koa hides the message on any 5xx, so the response
+was a bare `Internal Server Error`. A video with no captions, a mistyped id and
+YouTube refusing the request were indistinguishable, and all three read as a bug
+in this plugin. Failures are now classified: 404 when the video genuinely has
+nothing to fetch, 502 when YouTube would not return it, both carrying the reason.
+
 ## 2.1.1 - 2026-08-27
 
 Fixes the peer dependency, which named a package that no longer receives
