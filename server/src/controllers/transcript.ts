@@ -1,6 +1,40 @@
 import type { Core } from '@strapi/strapi';
 import { extractYouTubeID } from '../utils/extract-youtube-id';
 
+/**
+ * Turn a fetch failure into a status the caller can act on.
+ *
+ * Everything used to come back as `ctx.throw(500, message)`, and Koa hides the
+ * message on any 5xx, so the response was a bare "Internal Server Error" with
+ * the reason discarded. A video with no captions, a mistyped id and YouTube
+ * refusing the request were indistinguishable, and all three read as a bug in
+ * this plugin.
+ *
+ * 404 for "this video has nothing to fetch", which the caller can fix, and 502
+ * for "YouTube would not give it to us", which they cannot. Both are 4xx/502
+ * rather than 500 so the message survives.
+ */
+function classify(message: string): { status: number; reason: string } {
+  const m = message.toLowerCase();
+
+  if (m.includes('unavailable') || m.includes('private') || m.includes('does not exist')) {
+    return { status: 404, reason: 'That video is unavailable, private, or does not exist.' };
+  }
+
+  if (m.includes('captions') || m.includes('transcript is disabled') || m.includes('no caption')) {
+    return { status: 404, reason: 'That video has no captions, so there is no transcript to fetch.' };
+  }
+
+  // Throttling, 5xx from YouTube, timeouts, socket errors. Upstream, not ours.
+  return {
+    status: 502,
+    reason:
+      'YouTube did not return the transcript. This is usually rate limiting on large ' +
+      'transcripts from an un-proxied address, and often succeeds on retry. Configure ' +
+      'proxyUrl if it keeps happening.',
+  };
+}
+
 const PLUGIN_ID = 'youtube-transcripts';
 
 const controller = ({ strapi }: { strapi: Core.Strapi }) => ({
@@ -53,8 +87,16 @@ const controller = ({ strapi }: { strapi: Core.Strapi }) => ({
       ctx.body = { data: transcript };
     } catch (error: any) {
       if (error.status) throw error;
-      strapi.log.error(`[${PLUGIN_ID}] getTranscript error: ${error.message}`);
-      ctx.throw(500, error.message || 'Failed to get transcript');
+
+      const message = error?.message ?? 'Failed to get transcript';
+      const { status, reason } = classify(message);
+
+      // Log the real error, return one the caller can act on. ctx.throw(500)
+      // was hiding every reason: Koa suppresses the message on any 5xx, so a
+      // missing-captions video and a YouTube refusal both arrived as a bare
+      // "Internal Server Error".
+      strapi.log.error(`[${PLUGIN_ID}] getTranscript failed (${status}): ${message}`);
+      ctx.throw(status, `${reason} (${message})`);
     }
   },
 });
