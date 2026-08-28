@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.3.0 - 2026-08-28
+
+Adds browser-level tests, which this plugin had none of.
+
+Four Playwright specs. Two check the admin page mounts at its route and loads
+without console errors, which is the only level that can catch a plugin failing
+to register or a bundle that was never rebuilt: the id changed from
+`ai-sdk-yt-transcripts` to `youtube-transcripts` and that moved the route.
+
+The other two assert the REST route reports failures usefully, and need no
+login, so they run anywhere the server does. They lock in the 2.2.0 fix: an
+unavailable video must answer **404 with a reason**, never the bare
+`Internal Server Error` that every failure used to produce. Both pass against a
+running server.
+
+The admin specs are opt-in through `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD`,
+skipping rather than failing without them. Run with `npm run test:browser`.
+
 ## 2.2.0 - 2026-08-28
 
 Makes the caption download survive YouTube refusing it, and stops the API route
