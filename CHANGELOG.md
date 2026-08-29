@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.4.0 - 2026-08-29
+
+Completes the video metadata, including one field that never worked.
+
+`videoPublishedAt` was null for every video ever stored. The extraction read it
+from `primary_info`, but the caller used `getBasicInfo`, which resolves that
+key to undefined. The field was added in 2.1.0, renamed to dodge Strapi's
+reserved `publishedAt`, and never once held a value. The fetch now prefers
+`getInfo`, which carries the date and everything `getBasicInfo` returns, and
+falls back to `getBasicInfo` if it fails, because a transcript is worth more
+than a date and the extra endpoint is the flakier of the two.
+
+`thumbnails` keeps every size YouTube offers rather than only the largest.
+A list view was loading a 1920x1080 image and scaling it down in the browser;
+there are five sizes down to 168x94. `thumbnailUrl` still holds the largest,
+so nothing reading it needs to change.
+
+`viewCount` is stored again.
+
+The wiring is covered by tests that drive the real fetch with youtubei.js
+mocked, not just the helpers in isolation: reverting the call site alone now
+turns a test red. Unit tests for the helper passed happily while the caller
+ignored it, which is exactly how ai-chat 3.1.0 shipped a fix that was not there.
+
+Backfill carries the three new fields, so `backfillMetadata: true` fills them
+on rows stored earlier.
+
 ## 2.3.0 - 2026-08-28
 
 Adds browser-level tests, which this plugin had none of.

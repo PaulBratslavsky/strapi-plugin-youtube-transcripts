@@ -29,7 +29,10 @@ export interface TranscriptData {
   author?: string | null;
   channelId?: string | null;
   thumbnailUrl?: string | null;
+  /** Every size YouTube offers, so a list view need not scale 1080p down. */
+  thumbnails?: VideoThumbnail[] | null;
   durationSec?: number | null;
+  viewCount?: number | null;
   description?: string | null;
   keywords?: string[] | null;
   category?: string | null;
@@ -39,28 +42,83 @@ export interface TranscriptData {
   fetchedAt?: string;
 }
 
+export interface VideoThumbnail {
+  url: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * Keep every size YouTube returns, widest first.
+ *
+ * Only the largest was being kept, which meant a list view had to load a
+ * 1920x1080 image and scale it down in the browser.
+ */
+function allThumbnails(thumbnails: unknown): VideoThumbnail[] | null {
+  if (!Array.isArray(thumbnails) || thumbnails.length === 0) return null;
+
+  const usable = thumbnails
+    .filter((t: any) => typeof t?.url === 'string')
+    .map((t: any) => ({
+      url: t.url,
+      width: typeof t.width === 'number' ? t.width : 0,
+      height: typeof t.height === 'number' ? t.height : 0,
+    }))
+    .sort((a, b) => b.width - a.width);
+
+  return usable.length > 0 ? usable : null;
+}
+
 /**
  * The largest thumbnail YouTube offers.
  *
  * The array is ordered widest first, but that is not contractual, so pick by
  * width rather than trusting position.
  */
-function bestThumbnail(thumbnails: unknown): string | null {
+export function bestThumbnail(thumbnails: unknown): string | null {
   if (!Array.isArray(thumbnails) || thumbnails.length === 0) return null;
 
   const best = thumbnails.reduce((a: any, b: any) => ((b?.width ?? 0) > (a?.width ?? 0) ? b : a));
   return best?.url ?? null;
 }
 
-/** Pull the video metadata out of a getBasicInfo response. */
-function extractMetadata(info: any, captionLanguage?: string | null) {
+/**
+ * Get the video info, preferring the response that actually carries the date.
+ *
+ * getBasicInfo resolves `primary_info` to undefined, so the publish date read
+ * from it was null for every video ever stored. getInfo populates primary_info
+ * and returns everything getBasicInfo does, including the caption tracks the
+ * transcript fetch needs, at the cost of one extra internal endpoint call.
+ *
+ * That endpoint is the flakier of the two, and a transcript is worth more than
+ * a date, so a getInfo failure falls back rather than failing the fetch.
+ */
+export async function fetchVideoInfo(
+  client: { getInfo: (id: string) => Promise<any>; getBasicInfo: (id: string) => Promise<any> },
+  videoId: string
+): Promise<any> {
+  try {
+    return await client.getInfo(videoId);
+  } catch (err) {
+    console.warn(
+      `[youtube-transcripts] getInfo failed for ${videoId}, falling back to getBasicInfo ` +
+        `(publish date will be null). Reason: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return await client.getBasicInfo(videoId);
+  }
+}
+
+/** Pull the video metadata out of a getBasicInfo or getInfo response. */
+export function extractMetadata(info: any, captionLanguage?: string | null) {
   const b = info?.basic_info ?? {};
 
   return {
     author: b.author ?? null,
     channelId: b.channel_id ?? null,
     thumbnailUrl: bestThumbnail(b.thumbnail),
+    thumbnails: allThumbnails(b.thumbnail),
     durationSec: typeof b.duration === 'number' ? b.duration : null,
+    viewCount: typeof b.view_count === 'number' ? b.view_count : null,
     description: b.short_description ?? null,
     keywords: Array.isArray(b.keywords) ? b.keywords : null,
     category: b.category ?? null,
@@ -380,8 +438,8 @@ async function fetchTranscriptFromYouTube(
     fetch: proxyFetch,
   });
 
-  // 2. Get basic info (includes caption tracks)
-  const info = await client.getBasicInfo(videoId);
+  // 2. Get video info (includes caption tracks, and the publish date via getInfo)
+  const info = await fetchVideoInfo(client, videoId);
 
   // Get title from basic info
   const title = info.basic_info?.title;

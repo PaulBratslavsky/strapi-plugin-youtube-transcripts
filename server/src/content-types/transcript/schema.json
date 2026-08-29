@@ -39,7 +39,13 @@
     "thumbnailUrl": {
       "type": "string"
     },
+    "thumbnails": {
+      "type": "json"
+    },
     "durationSec": {
+      "type": "integer"
+    },
+    "viewCount": {
       "type": "integer"
     },
     "description": {
