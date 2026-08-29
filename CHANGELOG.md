@@ -1,5 +1,42 @@
 # Changelog
 
+## 2.4.0 - 2026-08-29
+
+Completes the video metadata, including one field that never worked.
+
+`videoPublishedAt` was null for every video ever stored. The extraction read it
+from `primary_info`, but the caller used `getBasicInfo`, which resolves that
+key to undefined. The field was added in 2.1.0, renamed to dodge Strapi's
+reserved `publishedAt`, and never once held a value. The fetch now prefers
+`getInfo`, which carries the date and everything `getBasicInfo` returns, and
+falls back to `getBasicInfo` if it fails, because a transcript is worth more
+than a date and the extra endpoint is the flakier of the two.
+
+`thumbnails` keeps every size YouTube offers rather than only the largest.
+A list view was loading a 1920x1080 image and scaling it down in the browser;
+there are five sizes down to 168x94. `thumbnailUrl` still holds the largest,
+so nothing reading it needs to change.
+
+`viewCount` is stored again, as a `biginteger`. A popular video exceeds the
+2,147,483,647 ceiling of a 32-bit integer, so an `integer` column would have
+rejected it on Postgres. It survived local testing only because SQLite is
+dynamically typed. Strapi returns `biginteger` as a string, so read it as one.
+
+Backfill now also picks up rows written by 2.1 through 2.3. The gate previously
+required every metadata field to be null, which counted those rows as complete,
+and they are exactly the rows carrying a null publish date. It gates on
+`thumbnails` rather than on the date, because thumbnails come from `basic_info`
+and are present whenever a fetch succeeds, so the pass converges instead of
+retrying a video whose date is legitimately unavailable.
+
+The wiring is covered by tests that drive the real fetch with youtubei.js
+mocked, not just the helpers in isolation: reverting the call site alone now
+turns a test red. Unit tests for the helper passed happily while the caller
+ignored it, which is exactly how ai-chat 3.1.0 shipped a fix that was not there.
+
+Backfill carries the three new fields, so `backfillMetadata: true` fills them
+on rows stored earlier.
+
 ## 2.3.0 - 2026-08-28
 
 Adds browser-level tests, which this plugin had none of.

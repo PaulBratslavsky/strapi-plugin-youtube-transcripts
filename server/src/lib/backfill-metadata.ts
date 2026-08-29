@@ -31,7 +31,9 @@ const ADDED_FIELDS = [
   'author',
   'channelId',
   'thumbnailUrl',
+  'thumbnails',
   'durationSec',
+  'viewCount',
   'description',
   'keywords',
   'category',
@@ -47,8 +49,18 @@ export interface BackfillResult {
   failed: Array<{ videoId: string; reason: string }>;
 }
 
-function needsBackfill(row: Record<string, unknown>): boolean {
-  return ADDED_FIELDS.every((f) => row[f] === null || row[f] === undefined);
+export function needsBackfill(row: Record<string, unknown>): boolean {
+  const missing = (f: string) => row[f] === null || row[f] === undefined;
+
+  // Rows written before 2.1 have no metadata at all.
+  if (ADDED_FIELDS.every(missing)) return true;
+
+  // Rows written by 2.1 through 2.3 do have metadata, but never a publish date,
+  // because that field read from a response key getBasicInfo leaves undefined.
+  // Gating on thumbnails rather than on the date is what makes this converge:
+  // thumbnails come from basic_info, which is present whenever a fetch succeeds,
+  // while the date comes from getInfo and can legitimately stay null.
+  return missing('thumbnails');
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -89,7 +101,9 @@ export async function backfillMetadata(
           author: fresh.author ?? null,
           channelId: fresh.channelId ?? null,
           thumbnailUrl: fresh.thumbnailUrl ?? null,
+          thumbnails: fresh.thumbnails ?? null,
           durationSec: fresh.durationSec ?? null,
+          viewCount: fresh.viewCount ?? null,
           description: fresh.description ?? null,
           keywords: fresh.keywords ?? null,
           category: fresh.category ?? null,
