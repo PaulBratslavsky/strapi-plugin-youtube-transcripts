@@ -46,7 +46,7 @@
       "type": "integer"
     },
     "viewCount": {
-      "type": "integer"
+      "type": "biginteger"
     },
     "description": {
       "type": "text"

@@ -17,7 +17,17 @@ A list view was loading a 1920x1080 image and scaling it down in the browser;
 there are five sizes down to 168x94. `thumbnailUrl` still holds the largest,
 so nothing reading it needs to change.
 
-`viewCount` is stored again.
+`viewCount` is stored again, as a `biginteger`. A popular video exceeds the
+2,147,483,647 ceiling of a 32-bit integer, so an `integer` column would have
+rejected it on Postgres. It survived local testing only because SQLite is
+dynamically typed. Strapi returns `biginteger` as a string, so read it as one.
+
+Backfill now also picks up rows written by 2.1 through 2.3. The gate previously
+required every metadata field to be null, which counted those rows as complete,
+and they are exactly the rows carrying a null publish date. It gates on
+`thumbnails` rather than on the date, because thumbnails come from `basic_info`
+and are present whenever a fetch succeeds, so the pass converges instead of
+retrying a video whose date is legitimately unavailable.
 
 The wiring is covered by tests that drive the real fetch with youtubei.js
 mocked, not just the helpers in isolation: reverting the call site alone now
