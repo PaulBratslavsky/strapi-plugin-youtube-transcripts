@@ -38,6 +38,20 @@ function toDisplayName(name: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/**
+ * The full action id a host must check before offering this tool.
+ *
+ * Exposed to hosts through the `ai-tools` service, so a host never has to
+ * DERIVE it from the tool name. Deriving works only while both sides implement
+ * the same slug rules: `fetchTranscript` happens to agree, but a PascalCase
+ * name would give this side a leading hyphen (an invalid uid), and a name with
+ * consecutive capitals splits differently again. A declared id cannot drift
+ * from the registered one, because both come from here.
+ */
+export function actionForTool(name: string): string {
+  return `plugin::${PLUGIN_ID}.tool.${toActionSlug(name)}`;
+}
+
 export interface ToolActionDef {
   section: 'plugins';
   pluginName: string;
@@ -80,6 +94,9 @@ export async function registerToolPermissions(strapi: Core.Strapi): Promise<void
     const missing = buildToolActionDefs().filter(
       (def) => !provider.has?.(`plugin::${def.pluginName}.${def.uid}`),
     );
+    // `plugin::<id>.<uid>` above is the same string `actionForTool` builds;
+    // both are derived from `toActionSlug`, so a change to the slug moves the
+    // registration, the duplicate check and the declared id together.
 
     if (missing.length === 0) {
       strapi.log.debug(

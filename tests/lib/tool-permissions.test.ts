@@ -130,3 +130,43 @@ describe('registerToolPermissions', () => {
     expect(logs.join(' ')).toContain('Duplicated item key');
   });
 });
+
+describe('the action ids hosts are given', () => {
+  it('declares an action for every tool that has one registered', async () => {
+    // THE PROPERTY THAT MATTERS. A host checks the declared id against the
+    // caller's grants; this plugin registers the other. If they ever differ,
+    // the tool is gated on an id nobody can hold and vanishes from the chat
+    // with no error on either side.
+    const aiTools = (await import('../../server/src/services/ai-tools')).default;
+    const declared = aiTools().getTools() as Array<{ name: string; action?: string }>;
+    const registered = new Set(
+      buildToolActionDefs().map((def) => `plugin::${def.pluginName}.${def.uid}`),
+    );
+
+    for (const tool of declared) {
+      if (!tool.action) continue;
+      expect(registered, `${tool.name} declares an unregistered action`).toContain(tool.action);
+    }
+  });
+
+  it('gives every public tool an action', async () => {
+    const aiTools = (await import('../../server/src/services/ai-tools')).default;
+    const declared = aiTools().getTools() as Array<{ name: string; internal?: boolean; action?: string }>;
+    for (const tool of declared) {
+      if (tool.internal) continue;
+      expect(tool.action, `${tool.name} has no action`).toBeTruthy();
+    }
+  });
+
+  it('omits the action on internal tools, which have none registered', async () => {
+    // An internal tool gets no registered action, so declaring one would make a
+    // host gate it on an id that can never be granted.
+    const internalNames = new Set(
+      (await import('../../server/src/tools')).tools.filter((t) => t.internal).map((t) => t.name),
+    );
+    const aiTools = (await import('../../server/src/services/ai-tools')).default;
+    for (const tool of aiTools().getTools() as Array<{ name: string; action?: string }>) {
+      if (internalNames.has(tool.name)) expect(tool.action).toBeUndefined();
+    }
+  });
+});
