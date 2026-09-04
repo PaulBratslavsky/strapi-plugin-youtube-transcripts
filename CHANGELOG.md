@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.5.0 - 2026-09-04
+
+The plugin now owns its own permissions, so it works installed on its own.
+
+Its five tool permissions were registered by strapi-plugin-ai-chat, which
+declared an action for every tool contributed to it. Installed without ai-chat,
+this plugin had nothing in Settings > Roles at all. Even alongside ai-chat the
+actions only existed when the MCP server happened to be enabled, because that
+registration pass sits behind the MCP check.
+
+It now registers `plugin::youtube-transcripts.tool.<slug>` in its own bootstrap.
+These are the same ids ai-chat produced, deliberately: Strapi's
+`cleanPermissionsInDatabase` deletes grant rows whose action no longer exists,
+so a different slug would silently revoke everyone's access. Verified by boot:
+ten existing grants survived the handover untouched.
+
+Registration skips any action already present. Strapi builds the admin action
+provider with the default `throwOnDuplicates`, an older ai-chat still declares
+these same ids, and plugin bootstrap order is not ours to control, so whichever
+side runs first registers and the other stands down. A failure is logged rather
+than thrown; permissions should not stop the host booting.
+
+The admin route `/yt-transcript/:videoId` is now gated on
+`plugin::youtube-transcripts.tool.fetch-transcript`. It previously had an empty
+policy list, so any authenticated admin could call it whatever their role said.
+This is a behaviour change: grant that action to the roles that need it.
+
+Pairs with strapi-plugin-ai-chat 3.4.0, which stops registering these. Older
+versions of that plugin still work, since the duplicate skip covers them.
+
 ## 2.4.0 - 2026-08-29
 
 Completes the video metadata, including one field that never worked.
