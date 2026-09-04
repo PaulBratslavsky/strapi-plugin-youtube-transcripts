@@ -27,6 +27,15 @@ The admin route `/yt-transcript/:videoId` is now gated on
 policy list, so any authenticated admin could call it whatever their role said.
 This is a behaviour change: grant that action to the roles that need it.
 
+Each tool handed to a host now carries the action that gates it, on a new
+`action` field supplied by the `ai-tools` service. A host should check that id
+rather than deriving one from the tool name: derivation only holds while both
+sides implement identical slug rules, and when they silently disagree the tool
+disappears with no error on either side. `fetchTranscript` happens to agree
+today; a PascalCase name would produce a leading hyphen here, which is not a
+valid uid. Internal tools carry no action, because none is registered for them,
+and a host should read an absent `action` as "not gated" rather than "denied".
+
 Pairs with strapi-plugin-ai-chat 3.4.0, which stops registering these. Older
 versions of that plugin still work, since the duplicate skip covers them.
 

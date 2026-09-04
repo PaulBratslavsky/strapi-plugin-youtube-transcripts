@@ -24,6 +24,17 @@ export interface ToolDefinition {
   /** If true, only available in AI SDK admin chat. Not exposed via MCP. */
   internal?: boolean;
 
+  /**
+   * The admin permission action gating this tool, e.g.
+   * `plugin::youtube-transcripts.tool.fetch-transcript`.
+   *
+   * Not set here — the `ai-tools` service attaches it from
+   * `lib/tool-permissions`, so the declared id and the registered one are the
+   * same string by construction. Declared on the interface so hosts can see
+   * the field exists.
+   */
+  action?: string;
+
   /** If true, safe for unauthenticated public chat (read-only). */
   publicSafe?: boolean;
 
