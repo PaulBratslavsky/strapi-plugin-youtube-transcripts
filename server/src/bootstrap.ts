@@ -1,6 +1,7 @@
 import type { Core } from '@strapi/strapi';
 import { ProxyAgent, fetch as undiciFetch } from 'undici';
 import { backfillMetadata } from './lib/backfill-metadata';
+import { registerToolPermissions } from './lib/tool-permissions';
 
 const PLUGIN_ID = 'youtube-transcripts';
 
@@ -36,7 +37,13 @@ async function testProxyConnection(proxyUrl: string): Promise<{ success: boolean
 
 const bootstrap = async ({ strapi }: { strapi: Core.Strapi }) => {
   // Tools are registered via the ai-tools service (see services/ai-tools.ts).
-  // The ai-sdk plugin discovers and registers them automatically with namespace prefixing.
+  // The ai-chat plugin discovers and registers them with namespace prefixing.
+  //
+  // Their admin permissions, however, are ours. ai-chat used to declare them,
+  // which left this plugin ungovernable when installed on its own. Must happen
+  // in bootstrap: the action provider refuses registrations once Strapi is
+  // loaded.
+  await registerToolPermissions(strapi);
 
   // Log proxy configuration status and test connectivity
   const pluginConfig = strapi.config.get(`plugin::${PLUGIN_ID}`) as PluginConfig | undefined;
