@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.6.2 - 2026-10-26
 
 A 429 from YouTube's caption download now gets a retry that can succeed. The
 old retry asked for the same signed caption URL over the same proxy connection
