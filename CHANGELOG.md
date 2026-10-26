@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+A 429 from YouTube's caption download now gets a retry that can succeed. The
+old retry asked for the same signed caption URL over the same proxy connection
+within four seconds, so a rate limit came back three times in a row. Now, after
+a 429 (or 403), the retry waits longer, honours `Retry-After` (capped at 15s),
+and starts a new session on a new connection for a newly signed URL. On a
+rotating proxy that also means a new exit IP. Other failures retry as before.
+
+When every attempt is rate limited, the error now says so and points at
+`PROXY_URL`, instead of suggesting the video may not have captions.
+
 ## 2.6.1 - 2026-09-28
 
 Three fixes found by installing 2.6.0 into a clean Strapi 5.55.1 app.

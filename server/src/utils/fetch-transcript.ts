@@ -326,9 +326,6 @@ function parseTimedTextXml(xml: string): TranscriptSegment[] {
 }
 
 /**
- * Fetch timedtext XML from caption URL
- */
-/**
  * How many times to ask for the caption track before giving up.
  *
  * This request fails intermittently and the failure is not deterministic: three
@@ -339,13 +336,51 @@ function parseTimedTextXml(xml: string): TranscriptSegment[] {
  */
 const TIMEDTEXT_ATTEMPTS = 3;
 
-/** Wait between attempts, growing so a rate limit has time to clear. */
+/** Wait between attempts after a timeout or server error. */
 const RETRY_BACKOFF_MS = [1000, 3000];
+
+/**
+ * Wait between attempts after a 429. Longer than the plain backoff: retrying a
+ * rate limit within a second or two only earns another 429.
+ */
+const RATE_LIMIT_BACKOFF_MS = [2000, 6000];
+
+/** Never let a Retry-After header stall a tool call for longer than this. */
+const MAX_RETRY_AFTER_MS = 15_000;
 
 /** A per-attempt ceiling, so one hung request cannot consume the whole budget. */
 const TIMEDTEXT_TIMEOUT_MS = 25_000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** A caption download YouTube refused, keeping the HTTP status. */
+export class TimedTextError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+    readonly retryAfterMs?: number
+  ) {
+    super(message);
+    this.name = 'TimedTextError';
+  }
+}
+
+/**
+ * 429 is a rate limit, and 403 from timedtext is usually the same thing said
+ * less politely. Both are about who is asking, not about the video.
+ */
+function isRateLimited(error: unknown): error is TimedTextError {
+  return error instanceof TimedTextError && (error.status === 429 || error.status === 403);
+}
+
+/** Retry-After is either seconds or an HTTP date. */
+function parseRetryAfter(value: string | null | undefined): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  const ms = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - Date.now();
+  if (!Number.isFinite(ms) || ms <= 0) return undefined;
+  return Math.min(ms, MAX_RETRY_AFTER_MS);
+}
 
 async function fetchTimedTextOnce(
   captionUrl: string,
@@ -366,7 +401,11 @@ async function fetchTimedTextOnce(
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch timedtext: ${response.status}`);
+      throw new TimedTextError(
+        `Failed to fetch timedtext: ${response.status}`,
+        response.status,
+        parseRetryAfter(response.headers?.get?.('retry-after'))
+      );
     }
 
     const xml = await response.text();
@@ -380,34 +419,86 @@ async function fetchTimedTextOnce(
   }
 }
 
+/** A caption URL and the fetch to download it with. */
+export interface CaptionSource {
+  url: string;
+  fetch?: typeof fetch;
+}
+
+/**
+ * Download the caption track, retrying transient failures.
+ *
+ * A rate limit is not transient for a given URL and connection: the signed URL
+ * carries the session that was limited, and a keep-alive proxy connection keeps
+ * the same exit IP. So after a 429 the retry asks `refresh` for a new session on
+ * a new connection, which on a rotating proxy also means a new IP. Other errors
+ * retry the same URL, as before.
+ */
 async function fetchTimedTextXml(
-  captionUrl: string,
-  proxyFetch?: typeof fetch
+  first: CaptionSource,
+  options: { refresh?: () => Promise<CaptionSource>; viaProxy?: boolean } = {}
 ): Promise<string> {
+  let source = first;
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= TIMEDTEXT_ATTEMPTS; attempt += 1) {
     try {
-      return await fetchTimedTextOnce(captionUrl, proxyFetch);
+      return await fetchTimedTextOnce(source.url, source.fetch);
     } catch (error) {
       lastError = error;
       const message = error instanceof Error ? error.message : String(error);
 
       if (attempt === TIMEDTEXT_ATTEMPTS) break;
 
-      const wait = RETRY_BACKOFF_MS[attempt - 1] ?? 3000;
+      const limited = isRateLimited(error);
+      const backoff = (limited ? RATE_LIMIT_BACKOFF_MS : RETRY_BACKOFF_MS)[attempt - 1] ?? 6000;
+      const wait = limited ? Math.max(backoff, error.retryAfterMs ?? 0) : backoff;
       console.log(
         `[youtube-transcripts] caption fetch attempt ${attempt}/${TIMEDTEXT_ATTEMPTS} failed ` +
-          `(${message}); retrying in ${wait}ms`,
+          `(${message}); retrying in ${wait}ms${limited && options.refresh ? ' with a fresh session' : ''}`,
       );
       await sleep(wait);
+
+      if (limited && options.refresh) {
+        try {
+          source = await options.refresh();
+        } catch (refreshError) {
+          // Keep the old URL: one more try at it beats giving up early.
+          console.log(
+            `[youtube-transcripts] could not start a fresh session: ` +
+              `${refreshError instanceof Error ? refreshError.message : String(refreshError)}`,
+          );
+        }
+      }
     }
+  }
+
+  if (isRateLimited(lastError)) {
+    throw new TimedTextError(
+      `YouTube is rate limiting caption downloads from this server (HTTP ${lastError.status}), ` +
+        `${TIMEDTEXT_ATTEMPTS} attempts. This is about the server's IP address, not the video. ` +
+        (options.viaProxy
+          ? 'The configured proxy is being limited too: use a rotating residential proxy, or try again later.'
+          : 'Set PROXY_URL to a residential proxy, or try again later.'),
+      lastError.status,
+    );
   }
 
   throw new Error(
     `Caption download failed after ${TIMEDTEXT_ATTEMPTS} attempts. ` +
       `Last error: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
   );
+}
+
+/** One Innertube session, so a retry can start a new one the same way. */
+function createClient(proxyFetch?: typeof fetch) {
+  return Innertube.create({
+    generate_session_locally: true,
+    lang: 'en',
+    location: 'US',
+    retrieve_player: true, // Required to get caption tracks
+    fetch: proxyFetch,
+  });
 }
 
 /**
@@ -430,13 +521,7 @@ async function fetchTranscriptFromYouTube(
   }
 
   // 1. Create Innertube client with optional proxy
-  const client = await Innertube.create({
-    generate_session_locally: true,
-    lang: 'en',
-    location: 'US',
-    retrieve_player: true, // Required to get caption tracks
-    fetch: proxyFetch,
-  });
+  const client = await createClient(proxyFetch);
 
   // 2. Get video info (includes caption tracks, and the publish date via getInfo)
   const info = await fetchVideoInfo(client, videoId);
@@ -520,7 +605,24 @@ async function fetchTranscriptFromYouTube(
 
   // 5. Fetch timedtext XML
   console.log(`[youtube-transcripts] Video ${videoId} - Fetching caption track: ${englishTrack.language_code}`);
-  const xml = await fetchTimedTextXml(englishTrack.base_url, proxyFetch);
+  const xml = await fetchTimedTextXml(
+    { url: englishTrack.base_url, fetch: proxyFetch },
+    {
+      viaProxy: Boolean(options?.proxyUrl),
+      // A new proxy agent opens a new connection, and a new session gets a
+      // newly signed caption URL. getBasicInfo is enough: only the tracks are needed.
+      refresh: async () => {
+        const freshFetch = createProxyFetch(options?.proxyUrl);
+        const fresh = await (await createClient(freshFetch)).getBasicInfo(videoId);
+        const tracks = fresh.captions?.caption_tracks ?? [];
+        const track =
+          tracks.find((t) => t.language_code === englishTrack.language_code && t.kind === englishTrack.kind) ??
+          tracks.find((t) => t.language_code === englishTrack.language_code);
+        if (!track?.base_url) throw new Error('fresh session returned no matching caption track');
+        return { url: track.base_url, fetch: freshFetch };
+      },
+    }
+  );
 
   // 6. Parse XML to segments
   const segments = parseTimedTextXml(xml);
@@ -552,9 +654,13 @@ const fetchTranscript = async (videoId: string, options?: FetchOptions): Promise
   try {
     return await fetchTranscriptFromYouTube(videoId, options);
   } catch (error) {
+    // A rate limit says nothing about the video, so do not suggest it lacks captions.
+    const hint = isRateLimited(error)
+      ? ''
+      : 'The video may not have captions enabled, or may be unavailable. ';
     throw new Error(
       `Failed to fetch transcript for video ${videoId}. ` +
-        `The video may not have captions enabled, or may be unavailable. ` +
+        hint +
         `Error: ${error instanceof Error ? error.message : String(error)}`
     );
   }
